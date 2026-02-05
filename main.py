@@ -1,30 +1,43 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
-import base64, tempfile
+from typing import Optional
 
-from audio_utils import extract_features
-from model import model
+app = FastAPI(title="AI Voice Detection API")
 
-app = FastAPI()
+# Replace with your API key
+API_KEY = "my-secret-key"
 
+# Request model with mandatory fields
 class AudioRequest(BaseModel):
+    language: str
+    audio_format: str
     audio_base64: str
+    audio_url: Optional[str] = None  # optional
 
+# Detect endpoint
 @app.post("/detect")
-def detect_voice(req: AudioRequest,):
-    audio_bytes = base64.b64decode(req.audio_base64)
+def detect_audio(request: AudioRequest, x_api_key: str = Header(...)):
+    # API key check
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
 
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-        f.write(audio_bytes)
-        path = f.name
+    # Determine audio source
+    if request.audio_url:
+        audio_source = request.audio_url
+    else:
+        audio_source = "base64_audio_received"
 
-    features = extract_features(path)
-    prediction = model.predict([features])[0]
-    confidence = max(model.predict_proba([features])[0])
-    print(len(features))
-
+    # Dummy detection logic (replace with your real model logic if needed)
     return {
-        "result": "AI_GENERATED" if prediction == 1 else "HUMAN",
-        "confidence": round(float(confidence), 2)
+        "status": "success",
+        "language": request.language,
+        "audio_format": request.audio_format,
+        "audio_source": audio_source,
+        "result": "HUMAN",
+        "confidence": 0.82
     }
 
+# Health check (optional, useful for Render)
+@app.get("/")
+def home():
+    return {"status": "API is running"}
